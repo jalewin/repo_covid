@@ -11,9 +11,9 @@ class GlobalParams:
     TRANSITION_PROB = 0.01
     _disease_duration = 20
     RECOVERY_PROB = 1.0 / _disease_duration
-    _death_rate = 0.5
+    _death_rate = 0.05
     DEATH_PROB = 1 - (1 - _death_rate)**(1 / _disease_duration)
-    MAX_CYCLES = 100
+    MAX_CYCLES = 10000
 
     NUM_LOCATIONS = 100
     AVG_POPULATION = 50
@@ -201,13 +201,16 @@ class Country:
 
     def run_simulation(self):
         self.show_summary()
-        while self.globalState.cycle < GlobalParams.MAX_CYCLES:
+        status = self.health_summary()
+
+        while status['INFECTED']>0 and self.globalState.cycle < GlobalParams.MAX_CYCLES:
             # Health update
             self.globalState.update()
             for location in self.locations:
                 location.make_new_history_record()
                 location.update_population_health()
-            self.show_summary()
+            if self.globalState.cycle%20==0:
+                self.show_summary()
 
             # Transition update
             self.globalState.update()
@@ -216,9 +219,14 @@ class Country:
                 location.calc_transitions()
             for location in self.locations:
                 location.do_transitions()
-            self.show_summary()
+            if self.globalState.cycle%20==0:
+                self.show_summary()
+        print("Final State")
+        self.show_summary()
+
 
     def show_summary(self):
+        
         print(self)
 
 
