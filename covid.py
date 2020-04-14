@@ -205,11 +205,12 @@ class Country:
 
         while status['INFECTED']>0 and self.globalState.cycle < GlobalParams.MAX_CYCLES:
             # Health update
+            print(status)
             self.globalState.update()
             for location in self.locations:
                 location.make_new_history_record()
                 location.update_population_health()
-            if self.globalState.cycle%20==0:
+            if self.globalState.cycle%100==0:
                 self.show_summary()
 
             # Transition update
@@ -219,8 +220,9 @@ class Country:
                 location.calc_transitions()
             for location in self.locations:
                 location.do_transitions()
-            if self.globalState.cycle%20==0:
+            if self.globalState.cycle%100==0:
                 self.show_summary()
+            status = self.health_summary()
         print("Final State")
         self.show_summary()
 
