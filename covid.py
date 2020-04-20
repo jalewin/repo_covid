@@ -21,6 +21,9 @@ class GlobalParams:
     AVG_NEIGHBORS = 3
     INIT_INFECTED = 10
 
+    AVG_FAMILY_SIZE = 6
+    POPULATION_SIZE = 1000
+
 
 class GlobalState:
     def __init__(self):
@@ -48,6 +51,7 @@ class PersonState:
 
 
 class Person:
+    # TODO: fix not relateing to home, maybe remove home and use only locations?
     def __init__(self, id, home, locations, globalState):
         self.id = id
         self.history = [
@@ -107,8 +111,9 @@ class Location:
     # TODO: rethink if needed
     def __str__(self):
         visitors_map = self.health_summary()
-        health_summary = ", ".join(
-            [f"{status.name}:{visitors_map[status]}" for status in HealthStatus])
+        health_summary = ", ".join([
+            f"{status.name}:{visitors_map[status]}" for status in HealthStatus
+        ])
         return f"location: {self.name} ({self.id}) visitors: {len(self.visitors)} {health_summary}"
 
     def visit(self, person):
@@ -147,13 +152,11 @@ class Country:
         health_dict[HealthStatus.DEAD] = len(self.morgue)
         return health_dict
 
-    # TODO: rewrite
     def __str__(self):
         hh = self.health_summary()
         h_summary = ", ".join([f"{s.name}:{hh[s]}" for s in HealthStatus])
         #return "\n".join([f"cycle:{self.globalState.cycle}", h_summary])
-        return "\n".join([f"cycle:{self.globalState.cycle}", h_summary] +
-                         [loc.__str__() for loc in self.locations])
+        return "\n".join([f"cycle:{self.globalState.cycle}", h_summary])
 
     # TODO: delete
     def connect_locations(self, loc_a, loc_b):
@@ -162,7 +165,19 @@ class Country:
 
     # TODO: rewrite
     def create_random_country(self):
+        id = 0
+        while len(self.population) < GlobalParams.POPULATION_SIZE:
+            home = Location('home', id, 1)
+            id += 1
+            family_size = round(
+                random.gammavariate(2, 1 / 2) * GlobalParams.AVG_FAMILY_SIZE)
+            for _ in range(family_size):
+                pass
+                # random person
+                # random locations
+
         n_loc = 0
+
         ## generat locations and populations
         for ii in range(GlobalParams.NUM_LOCATIONS):
             new_location = Location(ii, self)
@@ -198,7 +213,7 @@ class Country:
             # Health update
             print(status)
             self.globalState.update()
-            
+
             for person in self.population:
                 person.live_one_cycle()
             for location in self.locations:
@@ -207,7 +222,10 @@ class Country:
             for person in self.population:
                 person.update_health()
                 person.make_new_history_record()
-            dead_population = [p for p in self.population if p.get_health() is HealthStatus.DEAD]
+            dead_population = [
+                p for p in self.population
+                if p.get_health() is HealthStatus.DEAD
+            ]
             self.morgue.add(dead_population)
             self.population.difference_update(dead_population)
 
