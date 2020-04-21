@@ -21,8 +21,10 @@ class GlobalParams:
     AVG_NEIGHBORS = 3
     INIT_INFECTED = 10
 
-    AVG_FAMILY_SIZE = 6
+    AVG_HOUSEHOLD_SIZE = 6
+    AVG_HOUSEHOLD_CC = 5
     POPULATION_SIZE = 1000
+    WORK_VISIT_PROB = 5 / 7
 
 
 class GlobalState:
@@ -137,13 +139,32 @@ class Location:
         self.visitors.clear()
 
 
+class HouseHold(Location):
+    def __init__(self, name, loc_id):
+        super().__init__(name, loc_id, 1)
+
+
+class CommunityCenter(Location):
+    pass
+
+
+class WorkPlace(Location):
+    def __init__(self, name, loc_id):
+        super().__init__(name, loc_id, GlobalParams.WORK_VISIT_PROB)
+
+
+class PublicTranspotation(Location):
+    def __init__(self, name, loc_id, visit_prob):
+        super().__init__(name, loc_id, visit_prob)
+        self.destenetion = None
+
+
 class Country:
     def __init__(self):
         self.locations = []
         self.population = set()
         self.morgue = set()
         self.globalState = GlobalState()
-        create_random_country()
 
     def health_summary(self):
         health_dict = {status: 0 for status in HealthStatus}
@@ -155,53 +176,7 @@ class Country:
     def __str__(self):
         hh = self.health_summary()
         h_summary = ", ".join([f"{s.name}:{hh[s]}" for s in HealthStatus])
-        #return "\n".join([f"cycle:{self.globalState.cycle}", h_summary])
         return "\n".join([f"cycle:{self.globalState.cycle}", h_summary])
-
-    # TODO: delete
-    def connect_locations(self, loc_a, loc_b):
-        loc_a.neighbors.append(loc_b)
-        loc_b.neighbors.append(loc_a)
-
-    # TODO: rewrite
-    def create_random_country(self):
-        id = 0
-        while len(self.population) < GlobalParams.POPULATION_SIZE:
-            home = Location('home', id, 1)
-            id += 1
-            family_size = round(
-                random.gammavariate(2, 1 / 2) * GlobalParams.AVG_FAMILY_SIZE)
-            for _ in range(family_size):
-                pass
-                # random person
-                # random locations
-
-        n_loc = 0
-
-        ## generat locations and populations
-        for ii in range(GlobalParams.NUM_LOCATIONS):
-            new_location = Location(ii, self)
-            pop = round(
-                random.gammavariate(2, 1 / 2) * GlobalParams.AVG_POPULATION)
-            for jj in range(pop):
-                new_person = Person(jj, ii, self.globalState)
-                new_location.visit(new_person)
-            self.locations.append(new_location)
-        ## connect locations
-        prob_connected = GlobalParams.AVG_NEIGHBORS / (
-            GlobalParams.NUM_LOCATIONS - 1)
-        for ii in range(len(self.locations)):
-            for jj in range(ii):
-                if bernoulli(prob_connected):
-                    self.connect_locations(self.locations[ii],
-                                           self.locations[jj])
-        ## infect someone in the population
-        for _ in range(GlobalParams.INIT_INFECTED):
-            ii = random.randrange(0, len(self.locations))
-            while len(self.locations[ii].population) == 0:
-                ii = random.randrange(0, len(self.locations))
-            chosen_person = random.choice(list(self.locations[ii].population))
-            chosen_person.history[-1].health = HealthStatus.INFECTED
 
     # TODO: check loging
     def run_simulation(self):
@@ -238,6 +213,46 @@ class Country:
 
     def show_summary(self):
         print(self)
+
+
+class CountryGenerator:
+    def __init__(self, globalState):
+        self.loc_unique_id = 0
+        self.country = Country()
+        self.WPs = []
+
+    def generateWorkPlaces(self, count):
+        for _ in range(count):
+            wp = WorkPlace('work', self._get_new_id())
+            self.WPs.append(wp)
+
+    def generateCommunity(self, population_size, community_center_count):
+
+        CCs = []
+
+        for _ in range(community_center_count):
+            CC = CommunityCenter()
+            CCs.append(CC)
+
+        pop = 0
+        while pop < population_size:
+            HH = HouseHold('home', self._get_new_id())
+            HH_CCs_count = random.gammavariate(2, 1 / 2) * GlobalParams.AVG_HOUSEHOLD_CC
+            HH_locations = random.choices(CCs, k=HH_CCs_count)
+            HH_size = min(
+                round(
+                    random.gammavariate(2, 1 / 2) *
+                    GlobalParams.AVG_HOUSEHOLD_SIZE), population_size - pop)
+            for _ in range(HH_size):
+                p = Person(self._get_new_id(), HH, HH_locations, self.country.globalState)
+                HH.visit(p)
+
+            #TODO: add WP and PT connections.
+
+
+    def _get_new_id(self):
+        self.loc_unique_id += 1
+        return self.loc_unique_id
 
 
 israel = Country()
