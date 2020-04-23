@@ -337,15 +337,13 @@ class CountryGenerator:
 
 def create_random_country():
     cg = CountryGenerator()
-
-    cg.generateWorkPlaces(4)
-    cg.generateCommunity(200, 5)
-    cg.generateCommunity(200, 3)
-    cg.generateCommunity(200, 6)
-    cg.generateCommunity(200, 5)
-    cg.generateCommunity(200, 4)
-    cg.generateCommunity(200, 6)
-    cg.generateCommunity(200, 7)
+    n_work = random.randint(2, 6)
+    cg.generateWorkPlaces(n_work)
+    n_comm = random.randint(5, 9)
+    for _ in range(n_comm):
+        pop_size = random.randint(100, 300)
+        n_CCs = random.randint(3, 7)
+        cg.generateCommunity(pop_size, n_CCs)
 
     county = cg.get_country()
     return county
@@ -353,5 +351,5 @@ def create_random_country():
 
 c = create_random_country()
 c.show_graph()
-print("press enter to exit")
-input()
+#print("press enter to exit")
+#input()
