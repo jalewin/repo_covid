@@ -26,7 +26,7 @@ class GlobalParams:
     INIT_INFECTED = 10
 
     AVG_HOUSEHOLD_SIZE = 6
-    AVG_HOUSEHOLD_CC = 5
+    AVG_HOUSEHOLD_CCs = 2
     AVS_HOUSEHOLD_WORKING_PEOPLE = 1.7
     POPULATION_SIZE = 1000
     WP_VISIT_PROB = 5 / 7
@@ -63,7 +63,7 @@ class Person:
     def __init__(self, id, home, locations, globalState):
         self.id = id
         self.history = [PersonState(globalState.cycle, home, HealthStatus.HEALTHY)]
-        self.locations = locations
+        self.locations = copy.deepcopy(locations)
         self.locations.append(home)
         self.globalState = globalState
 
@@ -242,8 +242,8 @@ class Country:
             height=880,  # height of frame area in pixels
             width=1980,
             linkDistance=60,  # distance between node. Increase this value to have more space between nodes
-            charge=-10,  # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
-            fontSize=5,  # size of the node names
+            charge=-20,  # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
+            fontSize=10,  # size of the node names
             fontFamily="serif",  # font og node names
             linkColour="#666",  # colour of edges, MUST be a common colour for the whole graph
             nodeColour="#69b3a2",  # colour of nodes, MUST be a common colour for the whole graph
@@ -263,9 +263,9 @@ class CountryGenerator:
 
     def generateWorkPlaces(self, count):
         for _ in range(count):
-            WP = WorkPlace("work", self._get_new_id())
-            self.WPs.append(WP)
-            self.country.locations.append(WP)
+            working_place = WorkPlace("WP", self._get_new_id())
+            self.WPs.append(working_place)
+            self.country.locations.append(working_place)
 
     # TODO: think on better random distributions for all random variables
     def generateCommunity(self, population_size, community_center_count):
@@ -273,48 +273,54 @@ class CountryGenerator:
         CCs = []
 
         for _ in range(community_center_count):
-            CC = CommunityCenter(
-                "community center", self._get_new_id(), GlobalParams.CC_VISIT_PROB
+            community_center = CommunityCenter(
+                "CC", self._get_new_id(), GlobalParams.CC_VISIT_PROB
             )
-            CCs.append(CC)
-            self.country.locations.append(CC)
+            CCs.append(community_center)
+            self.country.locations.append(community_center)
 
         pop_count = 0
         while pop_count < population_size:
             # Create random household (HH)
-            HH = HouseHold("home", self._get_new_id())
-            HH_CCs_count = round(
-                random.gammavariate(2, 1 / 2) * GlobalParams.AVG_HOUSEHOLD_CC
+            house = HouseHold("HH", self._get_new_id())
+            num_CCs = random.randint(
+                int(GlobalParams.AVG_HOUSEHOLD_CCs / 2),
+                int(GlobalParams.AVG_HOUSEHOLD_CCs * 1.5),
             )
             # Choose random community centers (CC)
-            HH_locations = random.choices(CCs, k=HH_CCs_count)
-            HH_size = min(
-                round(random.gammavariate(2, 1 / 2) * GlobalParams.AVG_HOUSEHOLD_SIZE),
+            # NOTE: random.choices can choose the same element couple of times
+            house_CCs = random.choices(CCs, k=min(num_CCs, len(CCs)))
+            house_size = min(
+                random.randint(
+                    int(GlobalParams.AVG_HOUSEHOLD_SIZE / 2),
+                    int(GlobalParams.AVG_HOUSEHOLD_SIZE * 1.5),
+                ),
                 population_size - pop_count,
             )
-            # TODO: fix error when HH_size = 0
-            if HH_size == 0:
-                HH_size = 1
-            HH_population = []
-            for _ in range(HH_size):
-                HH_population.append(
+            house_residents = []
+            for _ in range(house_size):
+                house_residents.append(
                     Person(
-                        self._get_new_id(), HH, HH_locations, self.country.globalState
+                        self._get_new_id(), house, house_CCs, self.country.globalState
                     )
                 )
 
-            # Choose random work for some people from the household
-            working_people_count = round(
-                random.gauss(GlobalParams.AVS_HOUSEHOLD_WORKING_PEOPLE, 0.5)
-            )
-            working_people = random.choices(HH_population, k=working_people_count)
-            for p in working_people:
-                p.locations.append(random.choice(self.WPs))
+            if len(self.WPs) > 0:
+                # Choose random work for some people from the household
+                working_people_count = random.randint(
+                    int(GlobalParams.AVS_HOUSEHOLD_WORKING_PEOPLE / 2),
+                    int(GlobalParams.AVS_HOUSEHOLD_WORKING_PEOPLE * 1.5),
+                )
+                working_people = random.choices(
+                    house_residents, k=min(working_people_count, len(house_residents))
+                )
+                for p in working_people:
+                    p.locations.append(random.choice(self.WPs))
 
-            self.country.locations.append(HH)
-            self.country.population.update(HH_population)
+            self.country.locations.append(house)
+            self.country.population.update(house_residents)
 
-            pop_count += len(HH_population)
+            pop_count += len(house_residents)
 
     def infect(self, infected_count):
         infected = random.choices(self.country.population, k=infected_count)
@@ -333,9 +339,13 @@ def create_random_country():
     cg = CountryGenerator()
 
     cg.generateWorkPlaces(4)
-    cg.generateCommunity(100, 2)
-    cg.generateCommunity(100, 2)
-    cg.generateCommunity(100, 2)
+    cg.generateCommunity(200, 5)
+    cg.generateCommunity(200, 3)
+    cg.generateCommunity(200, 6)
+    cg.generateCommunity(200, 5)
+    cg.generateCommunity(200, 4)
+    cg.generateCommunity(200, 6)
+    cg.generateCommunity(200, 7)
 
     county = cg.get_country()
     return county
@@ -343,3 +353,5 @@ def create_random_country():
 
 c = create_random_country()
 c.show_graph()
+print("press enter to exit")
+input()
