@@ -142,7 +142,7 @@ class Location:
                     person.infect()
 
     # TODO: better name
-    def finish_cycle(self):
+    def clear_visitors(self):
         self.visitors.clear()
 
 
@@ -180,15 +180,12 @@ class Country:
         return health_dict
 
     def __str__(self):
-        hh = self.health_summary()
-        h_summary = ", ".join([f"{s.name}:{hh[s]}" for s in HealthStatus])
-        return "\n".join([f"cycle:{self.globalState.cycle}", h_summary])
+        return "\n".join([f"cycle: {self.globalState.cycle}", self.health_summary()])
 
     # TODO: check loging
     def run_simulation(self):
         self.show_summary()
         status = self.health_summary()
-
         while (
             status[HealthStatus.INFECTED] > 0
             and self.globalState.cycle < GlobalParams.MAX_CYCLES
@@ -201,7 +198,7 @@ class Country:
                 person.live_one_cycle()
             for location in self.locations:
                 location.update_visitors_health()
-                location.finish_cycle()
+                location.clear_visitors()
             for person in self.population:
                 person.update_health()
                 person.make_new_history_record()
@@ -211,15 +208,9 @@ class Country:
             self.morgue.add(dead_population)
             self.population.difference_update(dead_population)
 
-            if self.globalState.cycle % 100 == 0:
-                self.show_summary()
-
             status = self.health_summary()
         print("Final State")
         self.show_summary()
-
-    def show_summary(self):
-        print(self)
 
     def get_graph_connections(self):
         connections = []
@@ -348,11 +339,12 @@ def create_random_country():
         print(f" Community {i + 1}, population: {pop_size}, community centers: {n_CCs}")
         cg.generateCommunity(pop_size, n_CCs)
 
-    county = cg.get_country()
-    return county
+    cg.infect(GlobalParams.INIT_INFECTED)
+    country = cg.get_country()
+    return country
 
 
 c = create_random_country()
 c.show_graph()
-print("press enter to exit")
-input()
+#print("press enter to exit")
+#input()
