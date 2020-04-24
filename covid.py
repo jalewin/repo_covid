@@ -280,8 +280,8 @@ class CountryGenerator:
             self.country.locations.append(community_center)
 
         pop_count = 0
+        # Create random households (HH)
         while pop_count < population_size:
-            # Create random household (HH)
             house = HouseHold("HH", self._get_new_id())
             num_CCs = random.randint(
                 int(GlobalParams.AVG_HOUSEHOLD_CCs / 2),
