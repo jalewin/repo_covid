@@ -58,11 +58,12 @@ class PersonState:
         return f"cycle:{self.cycle} loc:{self.location} health:{self.health}"
 
 
+# TODO: Add next_status or alike so all persons could be updated simultaneously
 class Person:
-    # TODO: fix not relateing to home, maybe remove home and use only locations?
     def __init__(self, id, home, locations, globalState):
         self.id = id
         self.history = [PersonState(globalState.cycle, home, HealthStatus.HEALTHY)]
+        self.next_health = self.history[-1].health
         self.locations = copy.deepcopy(locations)
         self.locations.append(home)
         self.globalState = globalState
@@ -71,34 +72,52 @@ class Person:
         return f"person:{self.id} last state:({self.history[-1]})"
 
     # TODO: change name?
-    def live_one_cycle(self):
+    def visit_locations(self):
         for location in self.locations:
             if bernoulli(location.visit_prob):
                 location.visit(self)
 
+    # changes will apply only after calling advance_state()
     def update_health(self):
         my_state = self.history[-1]
         assert my_state.cycle == self.globalState.cycle
         if my_state.health is HealthStatus.INFECTED:
             if bernoulli(GlobalParams.RECOVERY_PROB):
-                my_state.health = HealthStatus.RECOVERED
+                self.next_health = HealthStatus.RECOVERED
             elif bernoulli(GlobalParams.DEATH_PROB):
-                my_state.health = HealthStatus.DEAD
+                self.next_health = HealthStatus.DEAD
+        else:
+            self.next_health = my_state.health
 
+    # changes will apply only after calling advance_state()
     def infect(self):
         my_state = self.history[-1]
         assert my_state.cycle == self.globalState.cycle
-        my_state.health = HealthStatus.INFECTED
+        self.next_health = HealthStatus.INFECTED
+
+    # apply health changes
+    def advance_health_state(self):
+        my_state = self.history[-1]
+        assert self.globalState.cycle == my_state.cycle
+        assert self.next_health is not None
+        my_state.health = self.next_health
+        self.next_health = None
 
     def make_new_history_record(self):
         my_state = self.history[-1]
         assert self.globalState.cycle > my_state.cycle
-        new_state = copy.copy(my_state)
-        new_state.cycle = self.globalState.cycle
+        new_state = copy.deepcopy(my_state)
+        new_state - self.globalState.cycle
         self.history.append(new_state)
 
     def get_health(self):
-        return self.history[-1].health
+        my_state = self.history[-1]
+        return my_state.health
+
+    # changes will apply immediately
+    def set_health(self, status):
+        my_state = self.history[-1]
+        self.next_health = my_state.health = status
 
 
 class Location:
@@ -180,28 +199,35 @@ class Country:
         return health_dict
 
     def __str__(self):
-        return "\n".join([f"cycle: {self.globalState.cycle}", self.health_summary()])
+        health_dict = self.health_summary()
+        readable_dict = [f"{s.name:<10}: {health_dict[s]:<10}" for s in HealthStatus]
+        return "\n".join([f"cycle: {self.globalState.cycle}"] + readable_dict)
 
-    # TODO: check loging
+    # TODO: bugfix
     def run_simulation(self):
-        self.show_summary()
         status = self.health_summary()
+        print(self)
         while (
             status[HealthStatus.INFECTED] > 0
             and self.globalState.cycle < GlobalParams.MAX_CYCLES
         ):
-            # Health update
-            print(status)
-            self.globalState.update()
 
+            # Health update
             for person in self.population:
-                person.live_one_cycle()
+                person.visit_locations()
             for location in self.locations:
                 location.update_visitors_health()
-                location.clear_visitors()
             for person in self.population:
                 person.update_health()
-                person.make_new_history_record()
+
+            self.globalState.update()
+
+            # Finish cycle
+            for person in self.population:
+                person.advance_state()
+            for location in self.locations:
+                location.clear_visitors()
+
             dead_population = [
                 p for p in self.population if p.get_health() is HealthStatus.DEAD
             ]
@@ -209,8 +235,11 @@ class Country:
             self.population.difference_update(dead_population)
 
             status = self.health_summary()
+
+            print(self)
+
         print("Final State")
-        self.show_summary()
+        print(self)
 
     def get_graph_connections(self):
         connections = []
@@ -232,8 +261,8 @@ class Country:
             Target=2,  # column number of target
             height=880,  # height of frame area in pixels
             width=1980,
-            linkDistance=60,  # distance between node. Increase this value to have more space between nodes
-            charge=-20,  # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
+            linkDistance=30,  # distance between node. Increase this value to have more space between nodes
+            charge=-60,  # numeric value indicating either the strength of the node repulsion (negative value) or attraction (positive value)
             fontSize=10,  # size of the node names
             fontFamily="serif",  # font og node names
             linkColour="#666",  # colour of edges, MUST be a common colour for the whole graph
@@ -258,6 +287,7 @@ class CountryGenerator:
             self.WPs.append(working_place)
             self.country.locations.append(working_place)
 
+    # TODO: seprate the creation of communities from the creation of all of the social connections
     # TODO: think on better random distributions for all random variables
     def generateCommunity(self, population_size, community_center_count):
 
@@ -280,7 +310,7 @@ class CountryGenerator:
             )
             # Choose random community centers (CC)
             # NOTE: random.choices can choose the same element couple of times
-            house_CCs = random.choices(CCs, k=min(num_CCs, len(CCs)))
+            house_CCs = random.choices(CCs, k=num_CCs)
             house_size = min(
                 random.randint(
                     int(GlobalParams.AVG_HOUSEHOLD_SIZE / 2),
@@ -314,9 +344,10 @@ class CountryGenerator:
             pop_count += len(house_residents)
 
     def infect(self, infected_count):
-        infected = random.choices(self.country.population, k=infected_count)
+        # random.choices does not supports sets
+        infected = random.choices(tuple(self.country.population), k=infected_count)
         for p in infected:
-            p.infect()
+            p.set_health(HealthStatus.INFECTED)
 
     def get_country(self):
         return self.country
@@ -345,6 +376,7 @@ def create_random_country():
 
 
 c = create_random_country()
-c.show_graph()
+c.run_simulation()
+#c.show_graph()
 #print("press enter to exit")
 #input()
