@@ -5,6 +5,9 @@ from rpy2 import robjects as ro
 from rpy2.robjects.packages import importr
 import matplotlib.pyplot as plt
 
+from timeit import default_timer as timer
+
+
 networkD3 = importr("networkD3")
 
 
@@ -69,7 +72,8 @@ class Person:
         self.id = id
         self.history = [PersonState(globalState.cycle, home, HealthStatus.HEALTHY)]
         self.next_health = self.history[-1].health
-        self.locations = copy.deepcopy(locations)
+        # NOTE: performance issue
+        self.locations = copy.copy(locations)
         self.locations.append(home)
         self.globalState = globalState
 
@@ -175,8 +179,7 @@ class CommunityCenter(Location):
 
 
 class PublicTransportation(Location):
-    def __init__(self, name, loc_id, visit_prob):
-        super().__init__(name, loc_id, visit_prob)
+    pass
 
 
 class WorkPlace(Location):
@@ -202,17 +205,17 @@ class Country:
     def __str__(self):
         health_dict = self.health_summary()
         readable_dict = [f"{s.name:<10}: {health_dict[s]:<10}" for s in HealthStatus]
-        return "\n".join([f"cycle: {self.globalState.cycle}"] + readable_dict)
+        return "\n".join([f"Cycle: {self.globalState.cycle}"] + readable_dict)
 
-    def run_simulation(self):
+    def run_simulation(self, log=False):
+        begin_time = timer()
         status = self.health_summary()
         self.history.append(status)
-        print(self)
+        if log: print(self)
         while (
             status[HealthStatus.INFECTED] > 0
             and self.globalState.cycle < GlobalParams.MAX_CYCLES
         ):
-
             # Health update
             for person in self.population:
                 person.visit_locations()
@@ -237,9 +240,13 @@ class Country:
             self.population.difference_update(dead_population)
             status = self.health_summary()
             self.history.append(status)
-            print(self)
+            if log: print(self)
 
-        print("Final State")
+        elapsed_time = timer() - begin_time
+        print(f" Total time: {elapsed_time:.4}s")
+        print(f"{self.globalState.cycle / elapsed_time:.4} Cycles per second")
+        print(f"{self.globalState.cycle / elapsed_time * (len(self.population) + len(self.morgue)):.4} Peoples per second")
+        print("\n--- Final State ---")
         print(self)
 
     def get_graph_connections(self):
@@ -392,10 +399,17 @@ def create_random_country(factor = 1):
     country = cg.get_country()
     return country
 
+def get_country():
+    cg = CountryGenerator()
+    cg.generateWorkPlaces(3)
+    for _ in range(10):
+        cg.generateCommunity(500, 3)
+    cg.infect(10)
+    return cg.get_country()
 
-c = create_random_country(5)
+c = create_random_country(2)
+c.show_community_graph()
 c.run_simulation()
 c.show_status_graph()
-#c.show_community_graph()
-#print("press enter to exit")
-#input()
+print("press enter to exit")
+input()
