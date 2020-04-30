@@ -3,6 +3,7 @@ import random
 import copy
 from rpy2 import robjects as ro
 from rpy2.robjects.packages import importr
+import matplotlib.pyplot as plt
 
 networkD3 = importr("networkD3")
 
@@ -54,11 +55,15 @@ class PersonState:
         self.location = location
         self.health = health
 
+    def __copy__(self):
+        return PersonState(self.cycle, self.location, self.health)
+
     def __str__(self):
         return f"cycle:{self.cycle} loc:{self.location} health:{self.health}"
 
+    def __repr__(self):
+        return f"({self.cycle}, {self.location}, {self.health})"
 
-# TODO: Add next_status or alike so all persons could be updated simultaneously
 class Person:
     def __init__(self, id, home, locations, globalState):
         self.id = id
@@ -77,17 +82,14 @@ class Person:
             if bernoulli(location.visit_prob):
                 location.visit(self)
 
-    # changes will apply only after calling advance_state()
-    def update_health(self):
+    def update_current_health(self):
         my_state = self.history[-1]
         assert my_state.cycle == self.globalState.cycle
         if my_state.health is HealthStatus.INFECTED:
             if bernoulli(GlobalParams.RECOVERY_PROB):
-                self.next_health = HealthStatus.RECOVERED
+                my_state.health = HealthStatus.RECOVERED
             elif bernoulli(GlobalParams.DEATH_PROB):
-                self.next_health = HealthStatus.DEAD
-        else:
-            self.next_health = my_state.health
+                my_state.health = HealthStatus.DEAD
 
     # changes will apply only after calling advance_state()
     def infect(self):
@@ -99,15 +101,15 @@ class Person:
     def advance_health_state(self):
         my_state = self.history[-1]
         assert self.globalState.cycle == my_state.cycle
-        assert self.next_health is not None
-        my_state.health = self.next_health
-        self.next_health = None
+        if self.next_health is not None:
+            my_state.health = self.next_health
+            self.next_health = None
 
     def make_new_history_record(self):
         my_state = self.history[-1]
         assert self.globalState.cycle > my_state.cycle
-        new_state = copy.deepcopy(my_state)
-        new_state - self.globalState.cycle
+        new_state = copy.copy(my_state)
+        new_state.cycle = self.globalState.cycle
         self.history.append(new_state)
 
     def get_health(self):
@@ -127,14 +129,12 @@ class Location:
         self.id = loc_id
         self.visit_prob = visit_prob
 
-    # TODO: rethink if needed
     def health_summary(self):
         health_dict = {status: 0 for status in HealthStatus}
         for person in self.visitors:
             health_dict[person.get_health()] += 1
         return health_dict
 
-    # TODO: rethink if needed
     def __str__(self):
         visitors_map = self.health_summary()
         health_summary = ", ".join(
@@ -146,7 +146,6 @@ class Location:
         self.visitors.add(person)
 
     def update_visitors_health(self):
-        # print(f"after:  dead:{len(dead_population)} pop:{len(self.population)} morgue:{len(self.country.morgue)}")
         infected_count = sum(
             [p.get_health() is HealthStatus.INFECTED for p in self.visitors]
         )
@@ -159,6 +158,7 @@ class Location:
             if person.get_health() is HealthStatus.HEALTHY:
                 if bernoulli(infection_prob):
                     person.infect()
+        #print(f"c={infected_count}, p={infection_prob}")
 
     # TODO: better name
     def clear_visitors(self):
@@ -190,6 +190,7 @@ class Country:
         self.population = set()
         self.morgue = set()
         self.globalState = GlobalState()
+        self.history = []
 
     def health_summary(self):
         health_dict = {status: 0 for status in HealthStatus}
@@ -203,9 +204,9 @@ class Country:
         readable_dict = [f"{s.name:<10}: {health_dict[s]:<10}" for s in HealthStatus]
         return "\n".join([f"cycle: {self.globalState.cycle}"] + readable_dict)
 
-    # TODO: bugfix
     def run_simulation(self):
         status = self.health_summary()
+        self.history.append(status)
         print(self)
         while (
             status[HealthStatus.INFECTED] > 0
@@ -218,24 +219,24 @@ class Country:
             for location in self.locations:
                 location.update_visitors_health()
             for person in self.population:
-                person.update_health()
+                person.advance_health_state()
+                person.update_current_health()
 
             self.globalState.update()
 
             # Finish cycle
             for person in self.population:
-                person.advance_state()
+                person.make_new_history_record()
             for location in self.locations:
                 location.clear_visitors()
 
             dead_population = [
                 p for p in self.population if p.get_health() is HealthStatus.DEAD
             ]
-            self.morgue.add(dead_population)
+            self.morgue.update(dead_population)
             self.population.difference_update(dead_population)
-
             status = self.health_summary()
-
+            self.history.append(status)
             print(self)
 
         print("Final State")
@@ -248,7 +249,7 @@ class Country:
                 connections.append((f"p ({p.id})", f"{loc.name} ({loc.id})"))
         return connections
 
-    def show_graph(self):
+    def show_community_graph(self):
         connections = self.get_graph_connections()
         source = [conn[0] for conn in connections]
         target = [conn[1] for conn in connections]
@@ -273,6 +274,23 @@ class Country:
 
         print(graph)
 
+    def show_status_graph(self):
+        time = list(range(self.globalState.cycle + 1))
+        healthy = [record[HealthStatus.HEALTHY] for record in self.history]
+        infected = [record[HealthStatus.INFECTED] for record in self.history]
+        recovered = [record[HealthStatus.RECOVERED] for record in self.history]
+        dead = [record[HealthStatus.DEAD] for record in self.history]
+        plt.plot(time, healthy, label="Healthy")
+        plt.plot(time, infected, label="Infected")
+        plt.plot(time, recovered, label="Recovered")
+        plt.plot(time, dead, label="Dead")
+
+        plt.xlabel("Days (cycles)")
+        plt.ylabel("Population")
+        plt.title("COVID-19 simulation")
+        plt.legend()
+
+        plt.show()
 
 # TODO: add public transportation
 class CountryGenerator:
@@ -357,16 +375,16 @@ class CountryGenerator:
         return self.loc_unique_id
 
 
-def create_random_country():
+def create_random_country(factor = 1):
     cg = CountryGenerator()
-    n_work = random.randint(2, 8)
+    n_work = random.randint(2 * factor, 8 * factor)
     print(f" {n_work} works")
     cg.generateWorkPlaces(n_work)
-    n_comm = random.randint(3, 10)
+    n_comm = random.randint(3 * factor, 10 * factor)
     print(f" {n_comm} communities")
     for i in range(n_comm):
-        pop_size = random.randint(100, 300)
-        n_CCs = random.randint(3, 7)
+        pop_size = random.randint(100 * factor, 300 * factor)
+        n_CCs = random.randint(3 * factor, 7 * factor)
         print(f" Community {i + 1}, population: {pop_size}, community centers: {n_CCs}")
         cg.generateCommunity(pop_size, n_CCs)
 
@@ -375,8 +393,9 @@ def create_random_country():
     return country
 
 
-c = create_random_country()
+c = create_random_country(5)
 c.run_simulation()
-#c.show_graph()
+c.show_status_graph()
+#c.show_community_graph()
 #print("press enter to exit")
 #input()
