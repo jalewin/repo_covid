@@ -4,6 +4,7 @@ import copy
 from rpy2 import robjects as ro
 from rpy2.robjects.packages import importr
 import matplotlib.pyplot as plt
+import numpy as np
 
 from timeit import default_timer as timer
 
@@ -11,8 +12,33 @@ from timeit import default_timer as timer
 networkD3 = importr("networkD3")
 
 
+class RandomGenerator:
+    def __init__(self, batch_size: int):
+        self._batch_size = batch_size
+        self._generate_batch()
+        self._prev_idx = -1
+
+    def next(self) -> float:
+        """Return random floats in the half-open interval [0.0, 1.0)."""
+        self._prev_idx += 1
+        if self._prev_idx >= self._batch_size:
+            self._generate_batch()
+            self._prev_idx = 0
+        return self._randoms[self._prev_idx]
+
+    def bernoulli(self, prob: float) -> bool:
+        return self.next() < prob
+
+    def _generate_batch(self):
+        self._randoms = np.random.random(size=self._batch_size)
+
+
 def bernoulli(prob):
     return random.uniform(0, 1) < prob
+
+
+fast_random = RandomGenerator(10 ** 7)
+bernoulli = fast_random.bernoulli
 
 
 class GlobalParams:
@@ -66,6 +92,7 @@ class PersonState:
 
     def __repr__(self):
         return f"({self.cycle}, {self.location}, {self.health})"
+
 
 class Person:
     def __init__(self, id, home, locations, globalState):
@@ -162,7 +189,6 @@ class Location:
             if person.get_health() is HealthStatus.HEALTHY:
                 if bernoulli(infection_prob):
                     person.infect()
-        #print(f"c={infected_count}, p={infection_prob}")
 
     # TODO: better name
     def clear_visitors(self):
@@ -211,7 +237,8 @@ class Country:
         begin_time = timer()
         status = self.health_summary()
         self.history.append(status)
-        if log: print(self)
+        if log:
+            print(self)
         while (
             status[HealthStatus.INFECTED] > 0
             and self.globalState.cycle < GlobalParams.MAX_CYCLES
@@ -240,12 +267,15 @@ class Country:
             self.population.difference_update(dead_population)
             status = self.health_summary()
             self.history.append(status)
-            if log: print(self)
+            if log:
+                print(self)
 
         elapsed_time = timer() - begin_time
         print(f" Total time: {elapsed_time:.4}s")
         print(f"{self.globalState.cycle / elapsed_time:.4} Cycles per second")
-        print(f"{self.globalState.cycle / elapsed_time * (len(self.population) + len(self.morgue)):.4} Peoples per second")
+        print(
+            f"{self.globalState.cycle / elapsed_time * (len(self.population) + len(self.morgue)):.4} Peoples per second"
+        )
         print("\n--- Final State ---")
         print(self)
 
@@ -298,6 +328,7 @@ class Country:
         plt.legend()
 
         plt.show()
+
 
 # TODO: add public transportation
 class CountryGenerator:
@@ -382,7 +413,7 @@ class CountryGenerator:
         return self.loc_unique_id
 
 
-def create_random_country(factor = 1):
+def create_random_country(factor=1):
     cg = CountryGenerator()
     n_work = random.randint(2 * factor, 8 * factor)
     print(f" {n_work} works")
@@ -399,6 +430,7 @@ def create_random_country(factor = 1):
     country = cg.get_country()
     return country
 
+
 def get_country():
     cg = CountryGenerator()
     cg.generateWorkPlaces(3)
@@ -407,9 +439,18 @@ def get_country():
     cg.infect(10)
     return cg.get_country()
 
-c = create_random_country(2)
-c.show_community_graph()
+
+c = create_random_country(5)
+# c.show_community_graph()
 c.run_simulation()
 c.show_status_graph()
-print("press enter to exit")
-input()
+# print("press enter to exit")
+# input()
+
+# TODO: Check performance of:
+#   20.53   * visit_locations (111)
+#   17.86   * make_new_history_record (139)
+#   13.50   * bernoulli (29)
+#   07.98   * __copy__ (87)
+#   07.85   * health_summery (224)
+#   06.93   * update_visitors_health(179)
