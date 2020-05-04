@@ -33,10 +33,6 @@ class RandomGenerator:
         self._randoms = np.random.random(size=self._batch_size)
 
 
-def bernoulli(prob):
-    return random.uniform(0, 1) < prob
-
-
 fast_random = RandomGenerator(10 ** 7)
 bernoulli = fast_random.bernoulli
 
@@ -84,9 +80,6 @@ class PersonState:
         self.location = location
         self.health = health
 
-    def __copy__(self):
-        return PersonState(self.cycle, self.location, self.health)
-
     def __str__(self):
         return f"cycle:{self.cycle} loc:{self.location} health:{self.health}"
 
@@ -99,7 +92,6 @@ class Person:
         self.id = id
         self.history = [PersonState(globalState.cycle, home, HealthStatus.HEALTHY)]
         self.next_health = self.history[-1].health
-        # NOTE: performance issue
         self.locations = copy.copy(locations)
         self.locations.append(home)
         self.globalState = globalState
@@ -139,7 +131,6 @@ class Person:
     def make_new_history_record(self):
         my_state = self.history[-1]
         assert self.globalState.cycle > my_state.cycle
-        # new_state = copy.copy(my_state)
         new_state = PersonState(my_state.cycle, my_state.location, my_state.health)
         new_state.cycle = self.globalState.cycle
         self.history.append(new_state)
@@ -344,7 +335,7 @@ class CountryGenerator:
             self.WPs.append(working_place)
             self.country.locations.append(working_place)
 
-    # TODO: seprate the creation of communities from the creation of all of the social connections
+    # TODO?: seprate the creation of communities from the creation of all of the social connections
     # TODO: think on better random distributions for all random variables
     def generateCommunity(self, population_size, community_center_count):
 
@@ -401,7 +392,7 @@ class CountryGenerator:
             pop_count += len(house_residents)
 
     def infect(self, infected_count):
-        # random.choices does not supports sets
+        # random.choices does not support sets
         infected = random.choices(tuple(self.country.population), k=infected_count)
         for p in infected:
             p.set_health(HealthStatus.INFECTED)
@@ -442,16 +433,8 @@ def get_country():
 
 
 c = create_random_country(5)
-# c.show_community_graph()
 c.run_simulation()
-#c.show_status_graph()
-# print("press enter to exit")
-# input()
-
-# TODO: Check performance of:
-#   20.53   * visit_locations (111)
-#   17.86   * make_new_history_record (139)
-#   13.50   * bernoulli (29)
-#   07.98   * __copy__ (87)
-#   07.85   * health_summery (224)
-#   06.93   * update_visitors_health(179)
+c.show_community_graph()
+c.show_status_graph()
+print("press enter to exit")
+input()
