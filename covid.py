@@ -139,7 +139,8 @@ class Person:
     def make_new_history_record(self):
         my_state = self.history[-1]
         assert self.globalState.cycle > my_state.cycle
-        new_state = copy.copy(my_state)
+        # new_state = copy.copy(my_state)
+        new_state = PersonState(my_state.cycle, my_state.location, my_state.health)
         new_state.cycle = self.globalState.cycle
         self.history.append(new_state)
 
@@ -443,7 +444,7 @@ def get_country():
 c = create_random_country(5)
 # c.show_community_graph()
 c.run_simulation()
-c.show_status_graph()
+#c.show_status_graph()
 # print("press enter to exit")
 # input()
 
