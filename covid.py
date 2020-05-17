@@ -39,7 +39,6 @@ bernoulli = fast_random.bernoulli
 
 class GlobalParams:
     INFECTION_PROB = 1
-    TRANSITION_PROB = 0.01
     _disease_duration = 20
     RECOVERY_PROB = 1.0 / _disease_duration
     _death_rate = 0.05
