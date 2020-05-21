@@ -13,12 +13,12 @@ class Country {
   private:
     std::vector<Location*> m_locations = {};
     std::vector<Person> m_population = {};
-    std::vector<Person> m_morgue = {};
     GlobalState m_globalState = {};
     std::vector<HealthDict> m_history = {};
 
     HealthDict getHealthSummery() const;
     std::string getStringSummery() const;
+    static std::string toStringSummery(const HealthDict& healthDict);
 
   public:
     Country() {}

@@ -26,11 +26,20 @@ HealthDict Country::getHealthSummery() const {
     for (HealthStatus status : ALL_HEALTH_STATUSES) {
         rv[status] = 0;
     }
-    for (const Person person : m_population) {
+    for (const Person& person : m_population) {
         rv[person.getHealth()]++;
     }
-    rv[HealthStatus::DEAD] = static_cast<unsigned int>(m_morgue.size());
     return rv;
+}
+
+// Static
+std::string Country::toStringSummery(const HealthDict& healthDict) {
+    std::ostringstream stringStream;
+    for (auto& [status, count] : healthDict) {
+        stringStream << std::setw(10) << status;
+        stringStream << " : " << std::setw(7) << count << std::endl;
+    }
+    return stringStream.str();
 }
 
 void Country::runSimulation(bool log) {
@@ -42,7 +51,7 @@ void Country::runSimulation(bool log) {
 
     if (log) {
         std::cout << " Cycle: " << m_globalState.getCycle() << std::endl
-                  << getStringSummery() << std::endl;
+                  << toStringSummery(status) << std::endl;
     }
 
     while (status[HealthStatus::INFECTED] > 0 &&
@@ -50,49 +59,41 @@ void Country::runSimulation(bool log) {
 
         // Health update
         for (Person& person : m_population) {
-            person.visitLocations();
+            if (person.getHealth() != HealthStatus::DEAD) {
+                person.visitLocations();
+            }
         }
         for (Location* location : m_locations) {
             location->udpateVisitorsHealth();
         }
         for (Person& person : m_population) {
-            person.applyInfection();
-            person.updateHealth();
+            if (person.getHealth() != HealthStatus::DEAD) {
+                person.applyInfection();
+                person.updateHealth();
+            }
         }
 
         m_globalState.update();
 
         // Finish cycle
         for (Person& person : m_population) {
-            person.makeNewHistoryRecord();
+            if (person.getHealth() != HealthStatus::DEAD) {
+                person.makeNewHistoryRecord();
+            }
         }
         for (Location* location : m_locations) {
             location->clearVisitors();
         }
 
-        // Move dead people to the morgue
-        // First copy them
-        std::copy_if(m_population.begin(), m_population.end(),
-                     std::back_inserter(m_morgue), [](const Person& p) {
-                         return p.getHealth() == HealthStatus::DEAD;
-                     });
-        // Now delete them
-        m_population.erase(
-            std::remove_if(m_population.begin(), m_population.end(),
-                           [](const Person& p) {
-                               return p.getHealth() == HealthStatus::DEAD;
-                           }),
-            m_population.end());
-
         status = getHealthSummery();
         m_history.push_back(status);
         if (log) {
             std::cout << " Cycle: " << m_globalState.getCycle() << std::endl
-                      << getStringSummery() << std::endl;
+                      << toStringSummery(status) << std::endl;
         }
     }
 
     std::cout << "\n --- Final State --- \n"
               << " Cycle: " << m_globalState.getCycle() << std::endl
-              << getStringSummery() << std::endl;
+              << toStringSummery(status) << std::endl;
 }

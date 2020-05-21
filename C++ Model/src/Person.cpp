@@ -53,6 +53,7 @@ Person& Person::operator=(const Person& other) {
 }
 
 void Person::visitLocations() {
+    assert(getHealth() != HealthStatus::DEAD);
     for (Location* location : m_locations) {
         if (RandomUtils::bernoulli(location->getVisitProb())) {
             location->visit(this);
@@ -77,18 +78,21 @@ void Person::updateHealth() {
 
 void Person::infect() {
     PersonState& myState = m_history.back();
+    assert(myState.health != HealthStatus::DEAD);
     assert(myState.cycle == m_globalState.getCycle());
     myState.health = HealthStatus::INFECTED;
 }
 
 void Person::flagInfection() {
     PersonState& myState = m_history.back();
+    assert(myState.health != HealthStatus::DEAD);
     assert(myState.cycle == m_globalState.getCycle());
     m_isFlagedInfected = true;
 }
 
 void Person::applyInfection() {
     PersonState& myState = m_history.back();
+    assert(myState.health != HealthStatus::DEAD);
     assert(myState.cycle == m_globalState.getCycle());
     if (m_isFlagedInfected) {
         myState.health = HealthStatus::INFECTED;
@@ -98,6 +102,7 @@ void Person::applyInfection() {
 
 void Person::makeNewHistoryRecord() {
     PersonState& myState = m_history.back();
+    assert(myState.health != HealthStatus::DEAD);
     assert(myState.cycle < m_globalState.getCycle());
     PersonState newState = PersonState(m_history.back());
     newState.cycle = m_globalState.getCycle();
