@@ -1,6 +1,7 @@
 #include "Country.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -45,6 +46,8 @@ std::string Country::toStringSummery(const HealthDict& healthDict) {
 void Country::runSimulation(bool log) {
 
     // TODO: Add time measurement
+
+    auto beginTime = std::chrono::steady_clock::now();
 
     HealthDict status = getHealthSummery();
     m_history.push_back(status);
@@ -92,6 +95,18 @@ void Country::runSimulation(bool log) {
                       << toStringSummery(status) << std::endl;
         }
     }
+
+    auto endTime = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        endTime - beginTime)
+                        .count() /
+                    1000.f;
+    std::cout << " Total time: " << duration << "s" << std::endl;
+    std::cout << " " << m_globalState.getCycle() / duration
+              << " Cycles per second" << std::endl;
+    std::cout << " "
+              << m_globalState.getCycle() / duration * m_population.size()
+              << " People per second" << std::endl;
 
     std::cout << "\n --- Final State --- \n"
               << " Cycle: " << m_globalState.getCycle() << std::endl

@@ -9,11 +9,11 @@ namespace GlobalParams {
         const float DISEASE_DURATION = 20.f;
     } // namespace Privates
 
-    const float INFECTION_PROB = 1.f;
+    const float INFECTION_PROB = 0.3f;
     const float RECOVERY_PROB = 1.f / Privates::DISEASE_DURATION;
     const float DEATH_PROB =
         1.f - powf(1 - Privates::DEATH_RATE, 1 / Privates::DISEASE_DURATION);
-    const unsigned int MAX_CYCLES = 10000;
+    const unsigned int MAX_CYCLES = 365;
     const unsigned int NUM_LOCATIONS = 100;
     const unsigned int AVG_POPULATION = 50;
     const unsigned int AVG_NEIGHBORS = 3;

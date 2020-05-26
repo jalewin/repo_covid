@@ -34,7 +34,7 @@ void Location::udpateVisitorsHealth() {
     if (infectedCount == 0 || infectedCount == m_visitors.size()) {
         return;
     }
-    float infectionProb = static_cast<float>(infectedCount) / m_visitors.size();
+    float infectionProb = static_cast<float>(infectedCount) / m_visitors.size() * GlobalParams::INFECTION_PROB;
 
     for (Person* person : m_visitors) {
         if (person->getHealth() == HealthStatus::HEALTHY) {

@@ -425,15 +425,15 @@ def create_random_country(factor=1):
 def get_country():
     cg = CountryGenerator()
     cg.generateWorkPlaces(3)
-    for _ in range(10):
-        cg.generateCommunity(500, 3)
+    for _ in range(50):
+        cg.generateCommunity(1000, 3)
     cg.infect(10)
     return cg.get_country()
 
 
-c = create_random_country(5)
-c.run_simulation()
-c.show_community_graph()
-c.show_status_graph()
-print("press enter to exit")
-input()
+c = get_country() #create_random_country(5)
+c.run_simulation(True)
+#c.show_community_graph()
+#c.show_status_graph()
+#print("press enter to exit")
+#input()
